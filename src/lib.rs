@@ -54,6 +54,7 @@ fn usage() {
     eprintln!("redoxer test - cargo test with Redox target in Redox VM");
     eprintln!("redoxer write-exec - write redoxer exec test configuration");
     eprintln!("redoxer toolchain - install toolchain");
+    eprintln!("redoxer version - get version");
     process::exit(1);
 }
 
@@ -120,6 +121,12 @@ pub fn host_target() -> &'static str {
         _ => panic!("Unsupported host OS/ARCH!"),
     }
 }
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+fn print_version() {
+    println!("{}", VERSION);
+    std::process::exit(0);
+}
 
 pub fn main(args: &[String]) {
     match args.get(1) {
@@ -137,6 +144,7 @@ pub fn main(args: &[String]) {
             "pkg" => panic!("feature 'cli-pkg' is not compiled"),
             "toolchain" => toolchain::main(args),
             "write-exec" => writer::main(args),
+            "version" => print_version(),
             _ => usage(),
         },
         None => usage(),
