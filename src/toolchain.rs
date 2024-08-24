@@ -40,9 +40,10 @@ pub fn toolchain() -> io::Result<PathBuf> {
         return Ok(PathBuf::from(redoxer_toolchain));
     }
 
-    let url = format!("https://static.redox-os.org/toolchain/{}", target());
+    let target_str = target();
+    let url = format!("https://static.redox-os.org/toolchain/{}", target_str);
     let toolchain_dir = redoxer_dir().join("toolchain");
-    if !toolchain_dir.is_dir() {
+    if !toolchain_dir.is_dir() || !toolchain_dir.join(target_str).is_dir() {
         println!("redoxer: building toolchain");
 
         let toolchain_partial = redoxer_dir().join("toolchain.partial");

@@ -204,9 +204,16 @@ fn inner(
     gui: bool,
     output_opt: Option<String>,
 ) -> io::Result<i32> {
+    let target = target();
+    let arch = target.split('-').next().unwrap_or("x86_64");
+    let qemu_bin = format!("qemu-system-{}", arch);
+
     let kvm = Path::new("/dev/kvm").exists();
-    if !installed("qemu-system-x86_64")? {
-        eprintln!("redoxer: qemu-system-x86 not found, please install before continuing");
+    if !installed(qemu_bin.as_str())? {
+        eprintln!(
+            "redoxer: {} not found, please install before continuing",
+            qemu_bin.as_str()
+        );
         process::exit(1);
     }
 
@@ -258,7 +265,7 @@ fn inner(
                 None
             };
 
-            let toolchain_lib_dir = toolchain_dir.join(target()).join("lib");
+            let toolchain_lib_dir = toolchain_dir.join(target).join("lib");
             let lib_dir = redoxer_dir.join("lib");
             for obj in &[
                 "ld64.so.1",
@@ -324,16 +331,11 @@ fn inner(
         }
 
         if !fuse {
-            archive_free_space(
-                &redoxer_bin,
-                &redoxer_dir,
-                &bootloader_bin,
-                DISK_SIZE,
-            )?;
+            archive_free_space(&redoxer_bin, &redoxer_dir, &bootloader_bin, DISK_SIZE)?;
         }
 
         let redoxer_log = tempdir.path().join("redoxer.log");
-        let mut command = Command::new("qemu-system-x86_64");
+        let mut command = Command::new(qemu_bin.as_str());
         command
             .arg("-cpu")
             .arg("max")
