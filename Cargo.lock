@@ -1421,7 +1421,7 @@ dependencies = [
 
 [[package]]
 name = "redoxer"
-version = "0.2.43"
+version = "0.2.44"
 dependencies = [
  "dirs 5.0.1",
  "flate2",
