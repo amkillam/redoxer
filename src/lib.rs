@@ -52,6 +52,7 @@ fn usage() {
     eprintln!("redoxer rustc - cargo rustc with Redox target");
     eprintln!("redoxer test - cargo test with Redox target in Redox VM");
     eprintln!("redoxer toolchain - install toolchain");
+    eprintln!("redoxer version - get version");
     process::exit(1);
 }
 
@@ -71,6 +72,13 @@ pub fn target() -> &'static str {
     SUPPORTED_TARGETS[index]
 }
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+fn print_version() {
+    println!("{}", VERSION);
+    std::process::exit(0);
+}
+
 pub fn main(args: &[String]) {
     match args.get(1) {
         Some(arg) => match arg.as_str() {
@@ -80,6 +88,7 @@ pub fn main(args: &[String]) {
             "env" => env::main(args),
             "exec" => exec::main(args),
             "toolchain" => toolchain::main(args),
+            "version" => print_version(),
             _ => usage(),
         },
         None => usage(),
