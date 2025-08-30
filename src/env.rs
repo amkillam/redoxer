@@ -4,8 +4,8 @@ use anyhow::{anyhow, Context};
 
 use crate::{gnu_target, status_error, target, toolchain};
 
-pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Command> {
-    let toolchain_dir = toolchain().context("unable to init toolchain")?;
+pub async fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Command> {
+    let toolchain_dir = toolchain().await.context("unable to init toolchain")?;
 
     // PATH must be set first so cargo is sourced from the toolchain path
     {
@@ -104,7 +104,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     Ok(command)
 }
 
-fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<()> {
+async fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<()> {
     let program = match program {
         "env" => "env".to_string(),
         "ar" => format!("{}-ar", gnu_target()),
@@ -112,7 +112,8 @@ fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<(
         "cxx" => format!("{}-g++", gnu_target()),
         _ => return Err(anyhow!("Unknown env program {:?}", program)),
     };
-    command(program)?
+    command(program)
+        .await?
         .args(args)
         .status()
         .and_then(status_error)?;
@@ -138,8 +139,8 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
     h
 }
 
-pub fn main(args: &[String]) {
-    match inner(args.get(1).unwrap(), args.iter().cloned().skip(2)) {
+pub async fn main(args: &[String]) {
+    match inner(args.get(1).unwrap(), args.iter().cloned().skip(2)).await {
         Ok(()) => {
             process::exit(0);
         }

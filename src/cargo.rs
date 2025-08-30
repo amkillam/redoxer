@@ -6,8 +6,8 @@ use anyhow::Context;
 use crate::exec::RedoxerExecConfig;
 use crate::{status_error, target, toolchain};
 
-fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
-    let toolchain_dir = toolchain()?;
+async fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
+    let toolchain_dir = toolchain().await?;
 
     // PATH must be set first so cargo is sourced from the toolchain path
     {
@@ -63,7 +63,8 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
     let cc_target_var = target().replace("-", "_");
     let cargo_target_var = cc_target_var.to_uppercase();
 
-    crate::env::command("cargo")?
+    crate::env::command("cargo")
+        .await?
         .arg(subcommand)
         .arg("--target")
         .arg(target())
@@ -79,8 +80,8 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn main(args: &[String]) {
-    match inner(args.iter().cloned()) {
+pub async fn main(args: &[String]) {
+    match inner(args.iter().cloned()).await {
         Ok(()) => {
             process::exit(0);
         }

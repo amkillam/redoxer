@@ -129,24 +129,31 @@ fn print_version() {
 }
 
 pub fn main(args: &[String]) {
-    match args.get(1) {
-        Some(arg) => match arg.as_str() {
-            "bench" | "build" | "check" | "doc" | "fetch" => cargo::main(args),
-            "install" | "run" | "rustc" | "test" => cargo::main(args),
-            "ar" | "cc" | "cxx" | "env" => env::main(args),
-            #[cfg(feature = "cli-exec")]
-            "exec" => exec::main(args),
-            #[cfg(not(feature = "cli-exec"))]
-            "exec" => panic!("feature 'cli-exec' is not compiled"),
-            #[cfg(feature = "cli-pkg")]
-            "pkg" => pkg::main(args),
-            #[cfg(not(feature = "cli-pkg"))]
-            "pkg" => panic!("feature 'cli-pkg' is not compiled"),
-            "toolchain" => toolchain::main(args),
-            "write-exec" => writer::main(args),
-            "version" => print_version(),
-            _ => usage(),
-        },
-        None => usage(),
-    }
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_time()
+        .enable_io()
+        .build()
+        .unwrap();
+    rt.block_on(async move {
+        match args.get(1) {
+            Some(arg) => match arg.as_str() {
+                "bench" | "build" | "check" | "doc" | "fetch" => cargo::main(args).await,
+                "install" | "run" | "rustc" | "test" => cargo::main(args).await,
+                "ar" | "cc" | "cxx" | "env" => env::main(args).await,
+                #[cfg(feature = "cli-exec")]
+                "exec" => exec::main(args),
+                #[cfg(not(feature = "cli-exec"))]
+                "exec" => panic!("feature 'cli-exec' is not compiled"),
+                #[cfg(feature = "cli-pkg")]
+                "pkg" => pkg::main(args),
+                #[cfg(not(feature = "cli-pkg"))]
+                "pkg" => panic!("feature 'cli-pkg' is not compiled"),
+                "toolchain" => toolchain::main(args).await,
+                "write-exec" => writer::main(args),
+                "version" => print_version(),
+                _ => usage(),
+            },
+            None => usage(),
+        }
+    })
 }

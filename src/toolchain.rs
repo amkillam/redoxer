@@ -1,3 +1,4 @@
+use futures_util::stream::StreamExt;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::{
@@ -30,42 +31,50 @@ pub fn progress_bar(total_len: usize, message: String) -> indicatif::ProgressBar
     pb
 }
 
-fn client_get_recurse(url: &str) -> ureq::Response {
-    let response = ureq::get(url).call();
+async fn client_get_recurse(url: &str) -> reqwest::Response {
+    let response = reqwest::get(url).await;
     match response {
         Ok(response) => response,
         Err(err) => {
             eprintln!("Failed to get {} with error: {}", url, err);
-            std::thread::sleep(std::time::Duration::from_secs(3));
-            client_get_recurse(url)
+            tokio::time::sleep(std::time::Duration::from_secs(3));
+            Box::pin(async move { client_get_recurse(url).await }).await
         }
     }
 }
 
-pub fn get_with_progress(
+pub async fn get_with_progress(
     url: impl AsRef<str> + std::marker::Send,
     progress_bar: &indicatif::ProgressBar,
 ) -> Vec<u8> {
-    let response = client_get_recurse(url.as_ref());
+    let response = client_get_recurse(url.as_ref()).await;
     let response_length: u64 = response
-        .header("Content-Length")
+        .headers()
+        .get("Content-Length")
+        .unwrap()
+        .to_str()
         .unwrap()
         .parse::<u64>()
         .unwrap();
     progress_bar.set_length(response_length);
     let mut resp_buf = Vec::with_capacity(response_length as usize);
-    match progress_bar
-        .wrap_read(response.into_reader())
-        .take(response_length)
-        .read_to_end(&mut resp_buf)
-    {
-        Ok(_) => resp_buf,
-        Err(_) => {
-            eprintln!("Failed to complete request. Retrying...");
-            std::thread::sleep(std::time::Duration::from_secs(3));
-            get_with_progress(url, progress_bar)
+    let mut resp_stream = response.bytes_stream();
+    let mut pinned_resp_stream = core::pin::Pin::new(&mut resp_stream);
+    while let Some(chunk) = pinned_resp_stream.next().await {
+        match chunk {
+            Ok(bytes) => {
+                progress_bar.inc(bytes.len() as u64);
+                resp_buf.extend_from_slice(&bytes);
+            }
+            Err(err) => {
+                eprintln!("Failed to read chunk with error: {}", err);
+                eprintln!("Retrying...");
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                return Box::pin(async move { get_with_progress(url, progress_bar).await }).await;
+            }
         }
     }
+    resp_buf
 }
 
 const B: usize = 1;
@@ -162,12 +171,12 @@ fn unpack_tar_with_progress<P: AsRef<Path>>(tar_bytes: &[u8], path: P) -> io::Re
     tar_progress_bar.finish();
     Ok(())
 }
-fn download_extract_toolchain<P: AsRef<Path>>(url: &str, path: P) -> io::Result<()> {
+async fn download_extract_toolchain<P: AsRef<Path>>(url: &str, path: P) -> io::Result<()> {
     let download_progress_bar = progress_bar(
         ROUGH_TOOLCHAIN_ARCHIVE_SIZE,
         "Downloading toolchain...".to_string(),
     );
-    let tar_gz_bytes = get_with_progress(url, &download_progress_bar);
+    let tar_gz_bytes = get_with_progress(url, &download_progress_bar).await;
 
     download_progress_bar.finish();
 
@@ -187,7 +196,7 @@ fn download_extract_toolchain<P: AsRef<Path>>(url: &str, path: P) -> io::Result<
     unpack_tar_with_progress(tar_bytes.as_slice(), path)
 }
 
-pub fn toolchain() -> io::Result<PathBuf> {
+pub async fn toolchain() -> io::Result<PathBuf> {
     if let Ok(redoxer_toolchain) = env::var("REDOXER_TOOLCHAIN") {
         return Ok(PathBuf::from(redoxer_toolchain));
     }
@@ -205,14 +214,14 @@ pub fn toolchain() -> io::Result<PathBuf> {
             .join(format!("{}-gcc", target_str))
             .is_file()
     {
-        download_extract_toolchain(url.as_str(), &toolchain_dir)?;
+        download_extract_toolchain(url.as_str(), &toolchain_dir).await?;
     }
 
     Ok(toolchain_dir)
 }
 
-pub fn main(_args: &[String]) {
-    match toolchain() {
+pub async fn main(_args: &[String]) {
+    match toolchain().await {
         Ok(_) => {
             process::exit(0);
         }
