@@ -37,7 +37,7 @@ async fn client_get_recurse(url: &str) -> reqwest::Response {
         Ok(response) => response,
         Err(err) => {
             eprintln!("Failed to get {} with error: {}", url, err);
-            tokio::time::sleep(std::time::Duration::from_secs(3));
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
             Box::pin(async move { client_get_recurse(url).await }).await
         }
     }

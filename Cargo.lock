@@ -1923,7 +1923,7 @@ dependencies = [
  "proc-mounts",
  "redox-pkg",
  "redox_installer",
- "redox_syscall 0.6.0",
+ "redox_syscall 0.5.18",
  "redoxfs",
  "reqwest",
  "tar",
